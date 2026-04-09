@@ -10,9 +10,15 @@ FILLER_PATTERNS = [
     (r"(?i)\bplease\s+can\s+you\s+", ""),
     (r"(?i)\bcould\s+you\s+please\s+", ""),
     (r"(?i)\bcan\s+you\s+please\s+", ""),
-    (r"(?i)\bI\s+(?:would|want\s+to|need\s+to|am\s+going\s+to|'d\s+like\s+to)\s+ask\s+(?:you\s+)?", ""),
-    (r"(?i)\bI\s+(?:would|'d)\s+like\s+(?:you\s+)?to\s+", ""),
+    # Handle both "I would like to ask you" and "I'd like to ask you" (contracted form)
+    (r"(?i)\bI(?:\s+would|'d)\s+(?:like\s+to\s+)?ask\s+(?:you\s+)?", ""),
+    # Handle both "I would like you to" and "I'd like you to"
+    (r"(?i)\bI(?:\s+would|'d)\s+like\s+(?:you\s+)?to\s+", ""),
+    # Handle "I want to", "I'd love to"
+    (r"(?i)\bI(?:\s+want|'d\s+love)\s+(?:you\s+)?to\s+", ""),
     (r"(?i)\bI\s+need\s+(?:you\s+)?to\s+", ""),
+    # "Please help me to X" → "X"
+    (r"(?i)\bplease\s+help\s+me\s+(?:to\s+)?", ""),
     (r"(?i)\bcould\s+you\s+", ""),
     (r"(?i)\bcan\s+you\s+", ""),
     (r"(?i)(?<!\w)please\s+(?=\w)", ""),
