@@ -29,6 +29,7 @@ dependencies = []
 rich = ["rich>=13.0"]
 tiktoken = ["tiktoken>=0.5"]
 full = ["rich>=13.0", "tiktoken>=0.5"]
+web  = ["flask>=3.0"]
 
 [project.scripts]
 promptforge = "promptforge.cli:main"
