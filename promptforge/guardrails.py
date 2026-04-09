@@ -41,7 +41,7 @@ ALREADY_GROUNDED_PATTERNS = [
     r'\b(according\s+to\s+the\s+(provided|following|document|text|data))',
     r'\b(from\s+the\s+(provided|following|above|given|attached))',
     r'don\'?t\s+(make\s+up|fabricate|invent|hallucinate)',
-    r'if\s+you\s+(are|\'re)\s+(not\s+sure|uncertain|unsure)',
+    r"if\s+you(?:\s+are|'re)\s+(not\s+sure|uncertain|unsure)",
     r'only\s+include\s+(facts|information)\s+you\'re\s+confident',
     r'do\s+not\s+fabricate',
     r'say\s+so\s+if\s+(you\'re\s+not\s+sure|uncertain)',
