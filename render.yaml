@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: promptforge
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --chdir web app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DEBUG
+        value: "0"
