@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>PromptForge</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #080c10;
+      --surface:    #0f1318;
+      --surface2:   #161c24;
+      --border:     #1e2730;
+      --accent:     #00e5a0;
+      --accent-dim: #00b87c;
+      --warn:       #f5a623;
+      --danger:     #e05555;
+      --text:       #d4dde8;
+      --text-dim:   #7a8a99;
+      --text-faint: #3d4f60;
+      --radius:     12px;
+      --font:       'SF Pro Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --mono:       'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    html { font-size: 16px; scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────── */
+    .app {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* ── Header ───────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 0 28px;
+    }
+    .logo {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--accent), #005f42);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .brand h1 {
+      font-size: 1.35rem; font-weight: 700;
+      background: linear-gradient(90deg, var(--accent), #80ffcc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+    }
+    .brand p {
+      font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;
+    }
+    .mode-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+      margin-left: auto;
+    }
+    .tab-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-dim); font-size: 0.8rem; font-weight: 500;
+      padding: 6px 14px; border-radius: 7px;
+      transition: all 0.15s;
+    }
+    .tab-btn.active {
+      background: var(--surface2); color: var(--accent);
+    }
+
+    /* ── Card ─────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    /* ── Textarea ─────────────────────────────────────────────── */
+    .prompt-area {
+      width: 100%; resize: none;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.9rem; line-height: 1.6;
+      padding: 14px;
+      min-height: 160px;
+      transition: border-color 0.2s;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .prompt-area:focus { border-color: var(--accent-dim); }
+    .prompt-area::placeholder { color: var(--text-faint); }
+    .char-count {
+      font-size: 0.72rem; color: var(--text-faint);
+      text-align: right; margin-top: 6px;
+    }
+    .char-count.warn { color: var(--warn); }
+
+    /* ── Options row ──────────────────────────────────────────── */
+    .options-row {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .select-wrap { position: relative; flex: 1; min-width: 140px; }
+    .select-wrap select {
+      width: 100%; appearance: none;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.82rem; padding: 9px 32px 9px 12px;
+      cursor: pointer; outline: none;
+      transition: border-color 0.2s;
+    }
+    .select-wrap select:focus { border-color: var(--accent-dim); }
+    .select-wrap::after {
+      content: '▾'; position: absolute;
+      right: 10px; top: 50%; transform: translateY(-50%);
+      color: var(--text-dim); pointer-events: none; font-size: 0.75rem;
+    }
+
+    /* ── Action button ────────────────────────────────────────── */
+    .btn-primary {
+      width: 100%; padding: 14px;
+      background: var(--accent); border: none; border-radius: 10px;
+      color: #000; font-size: 1rem; font-weight: 700;
+      cursor: pointer; margin-top: 10px;
+      transition: opacity 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .btn-primary.loading::after {
+      content: '';
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(0,0,0,0.3);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-left: 8px; vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Score bars ───────────────────────────────────────────── */
+    .score-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 420px) { .score-grid { grid-template-columns: 1fr; } }
+
+    .score-item { }
+    .score-label {
+      font-size: 0.72rem; color: var(--text-dim);
+      display: flex; justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    .score-val { font-weight: 600; color: var(--text); }
+    .score-bar-track {
+      height: 6px; background: var(--surface2);
+      border-radius: 4px; overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%; border-radius: 4px;
+      background: var(--accent);
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .score-bar-fill.dim { background: var(--text-faint); }
+
+    .total-score {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px;
+      background: var(--surface2);
+      border-radius: 10px; margin-bottom: 12px;
+    }
+    .total-num {
+      font-size: 2.2rem; font-weight: 800;
+      color: var(--accent); line-height: 1;
+    }
+    .total-grade {
+      font-size: 1.4rem; font-weight: 700;
+      color: var(--text); margin-right: auto;
+    }
+    .total-delta {
+      font-size: 0.85rem; font-weight: 600;
+      padding: 4px 10px; border-radius: 20px;
+    }
+    .total-delta.pos { background: rgba(0,229,160,0.12); color: var(--accent); }
+    .total-delta.neg { background: rgba(224,85,85,0.12); color: var(--danger); }
+    .total-delta.neu { background: rgba(122,138,153,0.1); color: var(--text-dim); }
+
+    /* ── Result panels ────────────────────────────────────────── */
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px; margin-bottom: 12px;
+    }
+    @media (max-width: 560px) { .panels { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+    }
+    .panel.after { border-color: var(--accent-dim); }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-label {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-dim);
+    }
+    .panel.after .panel-label { color: var(--accent); }
+    .copy-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-faint); font-size: 0.75rem; padding: 2px 6px;
+      border-radius: 5px; transition: color 0.15s;
+    }
+    .copy-btn:hover, .copy-btn.copied { color: var(--accent); }
+    .panel-body {
+      padding: 12px;
+      font-family: var(--mono); font-size: 0.8rem; line-height: 1.6;
+      color: var(--text); white-space: pre-wrap; word-break: break-word;
+      max-height: 300px; overflow-y: auto;
+    }
+    .panel-body::-webkit-scrollbar { width: 4px; }
+    .panel-body::-webkit-scrollbar-track { background: transparent; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Passes applied ───────────────────────────────────────── */
+    .passes-list {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .pass-chip {
+      font-size: 0.72rem; font-weight: 500;
+      padding: 4px 10px; border-radius: 20px;
+      background: rgba(0,229,160,0.1);
+      color: var(--accent); border: 1px solid rgba(0,229,160,0.2);
+    }
+    .pass-chip.inactive {
+      background: var(--surface2);
+      color: var(--text-faint); border-color: var(--border);
+    }
+
+    /* ── Token stat ───────────────────────────────────────────── */
+    .token-stat {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; color: var(--text-dim);
+    }
+    .token-stat strong { color: var(--text); }
+    .token-num.saved { color: var(--accent); }
+    .token-num.added { color: var(--warn); }
+
+    /* ── Error banner ─────────────────────────────────────────── */
+    .error-banner {
+      background: rgba(224,85,85,0.1);
+      border: 1px solid rgba(224,85,85,0.3);
+      border-radius: 10px; padding: 12px 16px;
+      color: var(--danger); font-size: 0.85rem;
+      margin-bottom: 12px; display: none;
+    }
+
+    /* ── Utility ──────────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    .mt8 { margin-top: 8px; }
+
+    /* ── Analyze-only mode ────────────────────────────────────── */
+    #analyze-view .score-grid { grid-template-columns: 1fr 1fr; }
+
+    /* ── Skeleton loader ──────────────────────────────────────── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--surface) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 6px; height: 10px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">⚡</div>
+    <div class="brand">
+      <h1>PromptForge</h1>
+      <p>Mobile-ready prompt optimizer</p>
+    </div>
+    <div class="mode-tabs">
+      <button class="tab-btn active" data-mode="optimize" onclick="switchMode('optimize')">Optimize</button>
+      <button class="tab-btn"        data-mode="analyze"  onclick="switchMode('analyze')">Analyze</button>
+    </div>
+  </header>
+
+  <!-- Error banner -->
+  <div class="error-banner" id="error-banner"></div>
+
+  <!-- Input card -->
+  <div class="card">
+    <div class="card-title">Your Prompt</div>
+    <textarea id="prompt-input" class="prompt-area"
+      placeholder="Paste or type your prompt here…&#10;&#10;e.g. Can you please basically help me write a Python function that validates email addresses?"
+      rows="7" oninput="onInput()"></textarea>
+    <div class="char-count" id="char-count">0 / 20,000</div>
+
+    <!-- Options (optimize mode only) -->
+    <div class="options-row" id="opt-options">
+      <div class="select-wrap">
+        <select id="model-select">
+          <option value="">No model target</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="run-btn" onclick="run()" disabled>
+      <span id="btn-label">Optimize</span>
+    </button>
+  </div>
+
+  <!-- Results: optimize -->
+  <div id="optimize-results" class="hidden">
+
+    <!-- Score comparison -->
+    <div class="card" id="score-card">
+      <div class="card-title">Quality Score</div>
+      <div class="total-score">
+        <div>
+          <div class="total-num" id="score-after-total">—</div>
+          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px">After</div>
+        </div>
+        <div class="total-grade" id="score-after-grade">—</div>
+        <div class="total-delta" id="score-delta-badge"></div>
+      </div>
+      <div class="score-grid" id="score-dims"></div>
+    </div>
+
+    <!-- Before / After panels -->
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-label">Before</span>
+          <button class="copy-btn" onclick="copyText('before')">copy</button>
+        </div>
+        <div class="panel-body" id="before-text"></div>
+      </div>
+      <div class="panel after">
+        <div class="panel-header">
+          <span class="panel-label">After ✦</span>
+          <button class="copy-btn" onclick="copyText('after')">copy</button>
+        </div>
+        <div class="panel-body" id="after-text"></div>
+      </div>
+    </div>
+
+    <!-- Passes applied -->
+    <div class="card">
+      <div class="card-title">Passes Applied</div>
+      <div class="passes-list" id="passes-list"></div>
+    </div>
+
+    <!-- Token stats -->
+    <div class="card" id="token-card">
+      <div class="card-title">Token Impact</div>
+      <div class="token-stat" id="token-stat"></div>
+    </div>
+
+  </div>
+
+  <!-- Results: analyze only -->
+  <div id="analyze-results" class="hidden">
+    <div class="card">
+      <div class="card-title">Quality Breakdown</div>
+      <div class="total-score">
+        <div>
+          <div class="total-num" id="an-total">—</div>
+          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px">Score</div>
+        </div>
+        <div class="total-grade" id="an-grade">—</div>
+      </div>
+      <div class="score-grid" id="an-dims"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let mode = 'optimize';
+let lastResult = null;
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const res = await fetch('/api/models');
+    const { models } = await res.json();
+    const sel = document.getElementById('model-select');
+    const families = {};
+    models.forEach(m => {
+      if (!families[m.family]) families[m.family] = [];
+      families[m.family].push(m);
+    });
+    Object.entries(families).forEach(([family, list]) => {
+      const grp = document.createElement('optgroup');
+      grp.label = family.charAt(0).toUpperCase() + family.slice(1);
+      list.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name + (m.notes ? ` — ${m.notes}` : '');
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    });
+  } catch(e) { /* models won't load — not critical */ }
+})();
+
+// ── Mode switch ───────────────────────────────────────────────────────────────
+function switchMode(m) {
+  mode = m;
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === m)
+  );
+  document.getElementById('opt-options').classList.toggle('hidden', m !== 'optimize');
+  document.getElementById('btn-label').textContent = m === 'optimize' ? 'Optimize' : 'Analyze';
+  document.getElementById('optimize-results').classList.add('hidden');
+  document.getElementById('analyze-results').classList.add('hidden');
+  hideError();
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+function onInput() {
+  const v = document.getElementById('prompt-input').value;
+  const cc = document.getElementById('char-count');
+  cc.textContent = `${v.length.toLocaleString()} / 20,000`;
+  cc.classList.toggle('warn', v.length > 18000);
+  document.getElementById('run-btn').disabled = v.trim().length === 0;
+}
+
+// ── Run ───────────────────────────────────────────────────────────────────────
+async function run() {
+  const prompt = document.getElementById('prompt-input').value.trim();
+  if (!prompt) return;
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  hideError();
+
+  try {
+    if (mode === 'optimize') {
+      await runOptimize(prompt);
+    } else {
+      await runAnalyze(prompt);
+    }
+  } catch(e) {
+    showError(e.message || 'Something went wrong. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+async function runOptimize(prompt) {
+  const model = document.getElementById('model-select').value || null;
+  const res = await fetch('/api/optimize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, model }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  renderOptimize(data);
+}
+
+async function runAnalyze(prompt) {
+  const res = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  renderAnalyze(data.score);
+}
+
+// ── Render: optimize ──────────────────────────────────────────────────────────
+function renderOptimize(data) {
+  lastResult = data;
+
+  // Before/after text
+  document.getElementById('before-text').textContent = data.original;
+  document.getElementById('after-text').textContent  = data.optimized;
+
+  // Score
+  const sb = data.score_before, sa = data.score_after;
+  document.getElementById('score-after-total').textContent = sa.total;
+  document.getElementById('score-after-grade').textContent = sa.grade;
+
+  const delta = data.quality_delta;
+  const badge = document.getElementById('score-delta-badge');
+  badge.textContent = delta > 0 ? `+${delta}` : delta === 0 ? '±0' : `${delta}`;
+  badge.className = 'total-delta ' + (delta > 0 ? 'pos' : delta < 0 ? 'neg' : 'neu');
+
+  // Dimension bars
+  const dims = ['clarity','specificity','structure','grounding'];
+  const dimLabels = { clarity:'Clarity', specificity:'Specificity', structure:'Structure', grounding:'Grounding' };
+  const container = document.getElementById('score-dims');
+  container.innerHTML = '';
+  dims.forEach(d => {
+    const bv = sb[d], av = sa[d];
+    const el = document.createElement('div');
+    el.className = 'score-item';
+    el.innerHTML = `
+      <div class="score-label">
+        <span>${dimLabels[d]}</span>
+        <span class="score-val">${bv} → <b style="color:var(--accent)">${av}</b> / 25</span>
+      </div>
+      <div class="score-bar-track">
+        <div class="score-bar-fill" style="width:${(av/25)*100}%"></div>
+      </div>`;
+    container.appendChild(el);
+  });
+
+  // Passes
+  const allPasses = ['compress','structure','role_framing','chain_of_thought','output_constraints','specificity','few_shot_hint','grounding','confidence_calibration','model_adapt'];
+  const applied = new Set(data.passes_applied);
+  const pList = document.getElementById('passes-list');
+  pList.innerHTML = '';
+  allPasses.forEach(p => {
+    const chip = document.createElement('span');
+    chip.className = 'pass-chip' + (applied.has(p) ? '' : ' inactive');
+    chip.textContent = p.replace(/_/g, ' ');
+    pList.appendChild(chip);
+  });
+
+  // Token stats
+  const ts = data.token_stats;
+  const tEl = document.getElementById('token-stat');
+  const direction = ts.direction;
+  const num = Math.abs(ts.delta);
+  const pct = Math.abs(ts.pct_change);
+  if (direction === 'reduced') {
+    tEl.innerHTML = `<strong>${ts.original}</strong> → <strong>${ts.optimized}</strong> tokens &nbsp; <span class="token-num saved">▼ ${num} saved (${pct}%)</span>`;
+  } else if (direction === 'increased') {
+    tEl.innerHTML = `<strong>${ts.original}</strong> → <strong>${ts.optimized}</strong> tokens &nbsp; <span class="token-num added">▲ ${num} added (${pct}%)</span>`;
+  } else {
+    tEl.innerHTML = `<strong>${ts.original}</strong> tokens — unchanged`;
+  }
+
+  document.getElementById('optimize-results').classList.remove('hidden');
+  document.getElementById('analyze-results').classList.add('hidden');
+  document.getElementById('optimize-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Render: analyze ───────────────────────────────────────────────────────────
+function renderAnalyze(score) {
+  document.getElementById('an-total').textContent = score.total;
+  document.getElementById('an-grade').textContent = score.grade;
+
+  const dims = ['clarity','specificity','structure','grounding'];
+  const dimLabels = { clarity:'Clarity', specificity:'Specificity', structure:'Structure', grounding:'Grounding' };
+  const container = document.getElementById('an-dims');
+  container.innerHTML = '';
+  dims.forEach(d => {
+    const v = score[d];
+    const el = document.createElement('div');
+    el.className = 'score-item';
+    el.innerHTML = `
+      <div class="score-label">
+        <span>${dimLabels[d]}</span>
+        <span class="score-val">${v} / 25</span>
+      </div>
+      <div class="score-bar-track">
+        <div class="score-bar-fill ${v < 8 ? 'dim' : ''}" style="width:${(v/25)*100}%"></div>
+      </div>`;
+    container.appendChild(el);
+  });
+
+  document.getElementById('analyze-results').classList.remove('hidden');
+  document.getElementById('optimize-results').classList.add('hidden');
+  document.getElementById('analyze-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Copy ─────────────────────────────────────────────────────────────────────
+async function copyText(which) {
+  if (!lastResult) return;
+  const text = which === 'before' ? lastResult.original : lastResult.optimized;
+  try {
+    await navigator.clipboard.writeText(text);
+    const btns = document.querySelectorAll('.copy-btn');
+    btns.forEach(b => { if (b.onclick.toString().includes(which)) b.textContent = '✓ copied'; });
+    setTimeout(() => btns.forEach(b => b.textContent = 'copy'), 2000);
+  } catch(e) {
+    // Fallback for older mobile browsers
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+// ── Error ─────────────────────────────────────────────────────────────────────
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('error-banner').style.display = 'none';
+}
+
+// ── Enter to submit (desktop) ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('prompt-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) run();
+  });
+});
+</script>
+</body>
+</html>
