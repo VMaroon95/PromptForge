@@ -61,24 +61,43 @@ def apply_role_framing(text: str, model_cfg: ModelConfig = None) -> str:
     if text.strip().endswith('?') or len(text.split()) < 8:
         return text
 
-    # Domain → role mapping with correct a/an
+    # Domain → role mapping with correct a/an.
+    # ORDER MATTERS: more specific patterns must come before general ones.
+    # E.g. medical before data-analyst (medical prompts may mention "data").
     domain_roles = [
+        # Specific technical domains first
+        (r'\b(medical|clinical|diagnosis|treatment|dosage|symptom|patient|healthcare|prescription)\b',
+         ("a", "medical information specialist")),
+        (r'\b(security|vulnerability|threat|audit|pentest|cve|exploit|malware|firewall|cybersec)\b',
+         ("a", "cybersecurity expert")),
+        (r'\b(legal|contract|clause|regulation|compliance|gdpr|statute|intellectual\s+property|litigation)\b',
+         ("a", "legal analyst")),
+        (r'\b(devops|ci\s*/\s*cd|kubernetes|docker|deployment|infrastructure|terraform|pipeline)\b',
+         ("a", "DevOps engineer")),
+        (r'\b(machine\s+learning|neural\s+network|deep\s+learning|model\s+training|pytorch|tensorflow|llm|bert|transformer)\b',
+         ("an", "ML engineer")),
         (r'\b(code|function|class|debug|refactor|sql|python|javascript|typescript|api|backend|frontend)\b',
          ("an", "expert software engineer")),
-        (r'\b(data|analysis|statistics|chart|metric|dashboard|csv|pandas|dataframe)\b',
-         ("a", "senior data analyst")),
-        (r'\b(security|vulnerability|threat|audit|pentest|cve|exploit)\b',
-         ("a", "cybersecurity expert")),
-        (r'\b(legal|contract|clause|regulation|compliance|gdpr|statute)\b',
-         ("a", "legal analyst")),
-        (r'\b(business|strategy|market|revenue|roi|competitive|go-to-market)\b',
-         ("a", "business strategist")),
-        (r'\b(medical|clinical|diagnosis|treatment|dosage|symptom|patient)\b',
-         ("a", "medical information specialist")),
-        (r'\b(finance|investment|portfolio|stock|bond|valuation|accounting)\b',
+        # Business/finance — check for specificity
+        (r'\b(finance|investment|portfolio|stock|bond|valuation|accounting|budget|financial\s+model)\b',
          ("a", "financial analyst")),
-        (r'\b(design|ux|ui|wireframe|figma|user.experience|interface)\b',
+        (r'\b(business|strategy|revenue|roi|competitive|go-to-market|startup|saas|b2b|product.market.fit)\b',
+         ("a", "business strategist")),
+        # Data — general, after specific domains
+        (r'\b(data\s+(analysis|science|visualization|pipeline|warehouse|lake)|statistics|pandas|dataframe|tableau|dashboard|csv)\b',
+         ("a", "senior data analyst")),
+        # Creative/content
+        (r'\b(seo|content\s+(marketing|strategy|calendar)|blog\s+(post|article)|copywriting|headline|landing\s+page)\b',
+         ("a", "content marketing specialist")),
+        (r'\b(design|ux|ui|wireframe|figma|user.experience|interface|prototype|accessibility)\b',
          ("a", "UX/UI designer")),
+        # Education and language
+        (r'\b(teach|lesson\s+plan|curriculum|student|learning\s+objective|pedagogy|explain\s+to\s+(a|beginners?))\b',
+         ("an", "expert educator")),
+        (r'\b(product\s+(manager|management|roadmap|backlog|sprint|user\s+story|acceptance\s+criteria))\b',
+         ("a", "senior product manager")),
+        (r'\b(translate|translation|localization|Spanish|French|German|Mandarin|Arabic|Japanese)\b',
+         ("a", "professional translator")),
     ]
 
     for pattern, (article, role) in domain_roles:
@@ -109,9 +128,44 @@ def apply_specificity(text: str) -> str:
     return (text + "\n\n" + " ".join(additions)) if additions else text
 
 
+def apply_few_shot_hint(text: str) -> str:
+    """
+    Suggest an example for complex generation tasks where the format
+    is custom or ambiguous. Only fires when:
+      - prompt is asking to generate/create/write something
+      - no example is already present
+      - the output format is non-standard (no JSON/markdown/list spec)
+    """
+    if _already_has(text, "example:", "for example", "e.g.", "such as", "<example>",
+                    "input:", "output:", "like this", "as follows", "here's an example"):
+        return text
+
+    # Must be a generation task
+    generation_triggers = re.compile(
+        r'\b(write|generate|create|draft|compose|produce)\b', re.I
+    )
+    if not generation_triggers.search(text):
+        return text
+
+    # Output format already specified — example hint is less critical
+    format_specified = re.search(
+        r'\b(json|markdown|csv|xml|numbered\s+list|bullet|table)\b', text, re.I
+    )
+    if format_specified:
+        return text
+
+    # Only add for non-trivial writes (not "Write a poem")
+    if len(text.split()) < 12:
+        return text
+
+    hint = "\n\nIf the desired output format is non-obvious, include a brief example of what you expect."
+    return text + hint
+
+
 TECHNIQUES = [
     ("role_framing",       apply_role_framing),
     ("chain_of_thought",   apply_chain_of_thought),
     ("output_constraints", apply_output_constraints),
     ("specificity",        apply_specificity),
+    ("few_shot_hint",      apply_few_shot_hint),
 ]
