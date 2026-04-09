@@ -1,79 +1,113 @@
 """
-Optimization techniques — chain-of-thought, few-shot, constraint injection, etc.
-Applied selectively based on prompt content.
+Optimization techniques — chain-of-thought, role framing, constraint injection, specificity.
+All passes are idempotent — they never duplicate instructions already present.
 """
 
 import re
 from .models import ModelConfig
 
-def apply_chain_of_thought(text: str) -> str:
-    """Add CoT instruction if prompt involves reasoning/analysis."""
-    cot_triggers = [
-        "analyze", "why", "how", "reason", "explain", "compare",
-        "evaluate", "decide", "solve", "figure out", "determine"
-    ]
+
+def _already_has(text: str, *phrases: str) -> bool:
+    """Case-insensitive check for existing phrases — prevents duplication."""
     lower = text.lower()
-    if any(t in lower for t in cot_triggers):
-        if "step by step" not in lower and "think through" not in lower:
-            return text + "\n\nThink step by step before giving your final answer."
+    return any(p.lower() in lower for p in phrases)
+
+
+def apply_chain_of_thought(text: str) -> str:
+    """Add CoT only if prompt involves reasoning AND doesn't already request it."""
+    if _already_has(text, "step by step", "think through", "chain of thought", "let's think"):
+        return text
+    cot_triggers = [
+        "analyze", "why", "how does", "reason", "compare", "evaluate",
+        "decide", "solve", "figure out", "determine", "assess", "explain why"
+    ]
+    if any(t in text.lower() for t in cot_triggers):
+        return text + "\n\nThink step by step before giving your final answer."
     return text
 
+
 def apply_output_constraints(text: str) -> str:
-    """Add output format constraint if missing."""
+    """Add format/length hints only if genuinely missing. Idempotent."""
     has_format = re.search(
-        r'\b(format|json|markdown|bullet|list|numbered|table|paragraph)\b',
+        r'\b(format|json|markdown|bullet|list|numbered|table|paragraph|output as|return a|return as)\b',
         text, re.I
     )
     has_length = re.search(
-        r'\b(brief|concise|short|long|detailed|word|sentence|paragraph)\b',
+        r'\b(brief|concise|short|long|detailed|word|sentence|paragraph|limit|max|under \d+)\b',
         text, re.I
     )
     additions = []
-    if not has_format:
-        additions.append("Use clear formatting with headers or bullets where appropriate.")
-    if not has_length:
-        additions.append("Be concise but complete.")
-    if additions:
-        return text + "\n\n" + " ".join(additions)
-    return text
+    fmt_hint = "Use clear formatting with headers or bullets where appropriate."
+    len_hint = "Be concise but complete."
+
+    if not has_format and not _already_has(text, fmt_hint):
+        additions.append(fmt_hint)
+    if not has_length and not _already_has(text, len_hint):
+        additions.append(len_hint)
+
+    return (text + "\n\n" + " ".join(additions)).rstrip() if additions else text
+
 
 def apply_role_framing(text: str, model_cfg: ModelConfig = None) -> str:
-    """Prepend a role if none exists and task is domain-specific."""
-    if re.search(r'\b(you are|act as|as a|your role)\b', text, re.I):
+    """
+    Prepend a domain-specific role only when:
+    - No role already exists
+    - Prompt is long enough to have a clear domain
+    - Domain is unambiguously detected
+    Uses correct grammar (a/an).
+    """
+    if re.search(r'\b(you are|act as|as a|your role|you\'re a)\b', text, re.I):
+        return text
+    if text.strip().endswith('?') or len(text.split()) < 8:
         return text
 
-    domain_roles = {
-        r'\b(code|function|class|debug|refactor|sql|python|javascript)\b': "expert software engineer",
-        r'\b(data|analysis|statistics|chart|metric|dashboard)\b': "senior data analyst",
-        r'\b(write|essay|article|blog|copy|content)\b': "professional writer",
-        r'\b(security|vulnerability|threat|audit|pentest)\b': "cybersecurity expert",
-        r'\b(legal|contract|clause|regulation|compliance)\b': "legal analyst",
-        r'\b(business|strategy|market|revenue|ROI)\b': "business strategist",
-    }
+    # Domain → role mapping with correct a/an
+    domain_roles = [
+        (r'\b(code|function|class|debug|refactor|sql|python|javascript|typescript|api|backend|frontend)\b',
+         ("an", "expert software engineer")),
+        (r'\b(data|analysis|statistics|chart|metric|dashboard|csv|pandas|dataframe)\b',
+         ("a", "senior data analyst")),
+        (r'\b(security|vulnerability|threat|audit|pentest|cve|exploit)\b',
+         ("a", "cybersecurity expert")),
+        (r'\b(legal|contract|clause|regulation|compliance|gdpr|statute)\b',
+         ("a", "legal analyst")),
+        (r'\b(business|strategy|market|revenue|roi|competitive|go-to-market)\b',
+         ("a", "business strategist")),
+        (r'\b(medical|clinical|diagnosis|treatment|dosage|symptom|patient)\b',
+         ("a", "medical information specialist")),
+        (r'\b(finance|investment|portfolio|stock|bond|valuation|accounting)\b',
+         ("a", "financial analyst")),
+        (r'\b(design|ux|ui|wireframe|figma|user.experience|interface)\b',
+         ("a", "UX/UI designer")),
+    ]
 
-    for pattern, role in domain_roles.items():
+    for pattern, (article, role) in domain_roles:
         if re.search(pattern, text, re.I):
-            prefix = f"You are a {role}.\n\n" if not (model_cfg and model_cfg.prefers_xml) else \
-                     f"<role>You are a {role}.</role>\n\n"
+            use_xml = model_cfg and model_cfg.prefers_xml
+            if use_xml:
+                prefix = f"<role>You are {article} {role}.</role>\n\n"
+            else:
+                prefix = f"You are {article} {role}.\n\n"
             return prefix + text
 
-    return text
+    return text  # No clear domain — don't assign a generic role
+
 
 def apply_specificity(text: str) -> str:
-    """Add specificity constraints for vague prompts."""
+    """Add specificity hints for vague prompts. Idempotent."""
     vague_patterns = [
-        (r'\b(tell me about|write about|explain)\b(?!\s+(how|why|what|when|where))',
+        (r'\b(tell me about|write about)\s+\w',
          "Be specific: include key facts, examples, and practical implications."),
         (r'\bsummariz(e|ing)\b',
          "Focus on the 3-5 most important points. Include key numbers or conclusions if present."),
     ]
     additions = []
+    lower = text.lower()
     for pattern, hint in vague_patterns:
-        if re.search(pattern, text, re.I) and hint not in text:
+        if re.search(pattern, lower) and hint.lower() not in lower:
             additions.append(hint)
-    if additions:
-        return text + "\n\n" + " ".join(additions)
-    return text
+    return (text + "\n\n" + " ".join(additions)) if additions else text
+
 
 TECHNIQUES = [
     ("role_framing",       apply_role_framing),
