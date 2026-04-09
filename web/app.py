@@ -1,13 +1,17 @@
 """
 PromptForge Web — mobile-friendly Flask interface.
-Run: python web/app.py  (then open http://localhost:5000)
+
+Local:  python web/app.py            → http://localhost:5000
+Deploy: gunicorn --chdir web app:app  (Render/Railway/Fly.io)
 """
 
 import sys
 import os
 
-# Make promptforge importable when running from /web
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Make promptforge importable whether running from /web or repo root
+_repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
 
 from flask import Flask, request, jsonify, render_template
 from promptforge.optimizer import optimize
