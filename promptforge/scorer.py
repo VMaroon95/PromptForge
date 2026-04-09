@@ -29,10 +29,12 @@ _VAGUE_QUANTIFIERS = re.compile(
 # Dangling pronouns at the start of a prompt (no antecedent)
 _DANGLING_PRONOUN = re.compile(r'^(it|this|that|they|them|these|those)\b', re.I)
 
-# Output-format keywords in the context of an output specification
+# Output-format keywords in the context of an output specification.
+# Allows up to ~8 words between the verb and the format spec (e.g. "Return your findings as a JSON").
 _OUTPUT_FORMAT_CTX = re.compile(
-    r'(output|return|format|provide|give me|respond)\s+(?:it\s+)?(?:as|in|with|using)?\s*'
-    r'(json|markdown|bullet|list|table|csv|xml|numbered|plain\s*text|code|html)',
+    r'\b(output|return|format|provide|give\s+me|respond)\b'
+    r'(?:\s+\w+){0,8}\s+(?:as|in|with|using)\s+(?:an?\s+)?'
+    r'(json|markdown|bullet(?:\s+point)?s?|numbered|list|table|csv|xml|html|plain\s*text|code)',
     re.I
 )
 
@@ -44,16 +46,17 @@ _LENGTH_SCOPE = re.compile(
     re.I
 )
 
-# Genuine grounding phrases — not just the word "source" in any context
+# Genuine grounding phrases — not just the word "source" in any context.
+# Note: "you're" = "you" + "'" + "re" with NO space → use you(?:\s+are|'re) not you\s+(are|'re)
 _GROUNDING_PHRASES = re.compile(
-    r'\b(cite\s+(your\s+)?sources?'
+    r'(cite\s+(your\s+)?sources?'
     r'|based\s+on\s+the\s+(provided|following|above|given)'
     r'|according\s+to\s+(the\s+)?(provided|following|document|text|data)'
     r'|from\s+the\s+(provided|following|above|given)'
     r'|don\'?t\s+(make\s+up|fabricate|invent|hallucinate)'
-    r'|if\s+you\s+(are|\'re)\s+(not\s+sure|uncertain|unsure)'
-    r'|only\s+(if\s+you\s+know|include\s+facts\s+you\'re\s+confident)'
-    r'|say\s+so\s+if\s+(you\'re\s+not\s+sure|uncertain))\b',
+    r"|if\s+you(?:\s+are|'re)\s+(not\s+sure|uncertain|unsure)"
+    r"|only\s+(if\s+you\s+know|include\s+facts\s+you're\s+confident)"
+    r"|say\s+so\s+if\s+(you're\s+not\s+sure|you\s+are\s+not\s+sure|uncertain))",
     re.I
 )
 
